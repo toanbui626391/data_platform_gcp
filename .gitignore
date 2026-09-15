@@ -1,0 +1,10 @@
+# Documents & local specifications
+Senior-Lead AI Data Platform Engineer.pdf
+*.pdf
+
+# OS & Editor artifacts
+.DS_Store
+Thumbs.db
+*.tmp
+.idea/
+.vscode/

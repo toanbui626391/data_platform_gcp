@@ -5,26 +5,35 @@
 
 ## 1. AI Agent Workload Architecture on GKE
 
-AI Agent workloads on GKE are engineered for **continuous, low-latency reasoning loops (Plan $\rightarrow$ Tool Call $\rightarrow$ Observe $\rightarrow$ Act)**. GKE provides purpose-built cloud-native capabilities—specifically **GKE Sandbox (managed gVisor)**, **GCS FUSE CSI driver**, and **GPU Autoscaling (KEDA)**—that make it an optimal runtime environment for autonomous agents.
+AI Agent workloads on GKE are engineered for both **interactive conversational reasoning** (User $\rightarrow$ Agent $\rightarrow$ LLM $\rightarrow$ Tool) and **autonomous, event-driven reactive execution** (Kafka Event $\rightarrow$ KEDA $\rightarrow$ Agent $\rightarrow$ Action). 
+
+GKE provides purpose-built cloud-native capabilities—specifically **GKE Sandbox (managed gVisor)**, **GCS FUSE CSI driver**, **KEDA event-driven autoscaling**, and direct connectivity to the streaming fabric—that make it an optimal runtime environment for autonomous agents.
 
 ```mermaid
 flowchart TB
-    subgraph ClientAndIngress["Client & Application Layer"]
+    subgraph IngressAndTriggers["Ingress & Reactive Event Triggers"]
         User["End Users / Mobile & Web Apps / Internal Tools"]:::gray
+        PriorityKafka["Kafka Priority Alert Topics\n(Real-Time Anomalies / CloudEvents)"]:::warning
+        KEDA["KEDA Autoscaler Controller\n(Triggered on Kafka Event Lag)"]:::cyan
+        
+        PriorityKafka --> KEDA
     end
 
     subgraph GKECluster["GKE Regional Cluster (asia-southeast1)"]
         subgraph AgentOrchestration["AI Agent Orchestration Layer"]
-            AgentGateway["Agent API Gateway"]:::purple
-            AgentWorkers["Agent Worker Pods (Agno / LangChain)\n- Stateless Orchestrator\n- Prompt & Context Assembler"]:::purple
+            AgentGateway["Agent API Gateway (REST / WebSocket)"]:::purple
+            AgentWorkers["Agent Worker Pods (Agno / LangChain)\n- Interactive User-Facing Replicas\n- Reactive Ephemeral Event Workers (KEDA)"]:::purple
             PrivacyProxy["Data Privacy & Guardrails Proxy\n(Vietnam Decree 13 PDPD Masking)"]:::danger
             
             User --> AgentGateway --> PrivacyProxy --> AgentWorkers
+            KEDA -.->|"Scale Out Ephemeral Workers"| AgentWorkers
+            PriorityKafka -->|"Pull Event Payload"| AgentWorkers
         end
 
         subgraph LLMServingGKE["LLM Serving Layer (GPU Node Pools)"]
             KServe["KServe Operator & Ingress"]:::purple
             vLLMPods["vLLM Engine Pods (NVIDIA L4 / A100)\n- PagedAttention & Continuous Batching\n- Streaming Model Weights from GCS FUSE"]:::purple
+            Embeddings["FastEmbed / Triton Pods\n(Sub-10ms Lightweight Embeddings)"]:::purple
             
             AgentWorkers <-->|"OpenAI / v2 API"| KServe --> vLLMPods
         end
@@ -43,14 +52,20 @@ flowchart TB
             GKESandboxPods <--> MCP
         end
 
-        subgraph MemoryHierarchyGCP["3-Tier Agent Memory Subsystem"]
-            L1["L1: Working Memory\n(Memorystore / Redis Cluster - Sub-ms)"]:::warning
-            L2["L2: Semantic Memory\n(PostgreSQL pgvector on Hyperdisk)"]:::warning
+        subgraph MemoryHierarchyGCP["Unified 3-Tier Agent Memory Subsystem"]
+            L1["L1: Real-Time Feature & Working Memory\n(Redis Cluster on GKE - Sub-ms)"]:::warning
+            L2["L2: Semantic Long-Term Memory\n(PostgreSQL pgvector on Hyperdisk)"]:::warning
             L3["L3: Episodic / Audit Memory\n(Apache Iceberg on GCS Bucket)"]:::success
             
             AgentWorkers <--> L1
             AgentWorkers <--> L2
             AgentWorkers -->|"Async Telemetry"| L3
+        end
+
+        subgraph StreamSyncFabric["Streaming State Synchronization (Speed Layer)"]
+            Flink["Apache Flink Stream Pipelines"]:::primary
+            Flink -->|"Sub-5ms Feature Counters"| L1
+            Flink -->|"Sub-second Chunk Vectors"| Embeddings --> L2
         end
 
         subgraph LakehouseAccess["Data Platform Core Access"]
@@ -69,13 +84,14 @@ flowchart TB
     end
 
     %% Subgraph Styling (Transparent & Dual-Mode Friendly)
-    style ClientAndIngress fill:none,stroke:#475569,stroke-width:1.5px,stroke-dasharray: 5 5,color:#94a3b8
+    style IngressAndTriggers fill:none,stroke:#475569,stroke-width:1.5px,stroke-dasharray: 5 5,color:#94a3b8
     style GKECluster fill:none,stroke:#0ea5e9,stroke-width:1.5px,stroke-dasharray: 5 5,color:#38bdf8
     style AgentOrchestration fill:none,stroke:#a855f7,stroke-width:1.5px,stroke-dasharray: 4 4,color:#d8b4fe
     style LLMServingGKE fill:none,stroke:#8b5cf6,stroke-width:1.5px,stroke-dasharray: 4 4,color:#c4b5fd
     style SandboxExecution fill:none,stroke:#f43f5e,stroke-width:1.5px,stroke-dasharray: 4 4,color:#fb7185
     style MCPGateway fill:none,stroke:#06b6d4,stroke-width:1.5px,stroke-dasharray: 4 4,color:#67e8f9
     style MemoryHierarchyGCP fill:none,stroke:#f59e0b,stroke-width:1.5px,stroke-dasharray: 4 4,color:#fcd34d
+    style StreamSyncFabric fill:none,stroke:#3b82f6,stroke-width:1.5px,stroke-dasharray: 4 4,color:#93c5fd
     style LakehouseAccess fill:none,stroke:#3b82f6,stroke-width:1.5px,stroke-dasharray: 4 4,color:#93c5fd
     style GCPStorageModels fill:none,stroke:#10b981,stroke-width:1.5px,stroke-dasharray: 5 5,color:#6ee7b7
 
@@ -99,7 +115,6 @@ flowchart TB
 Model serving on GKE utilizes **vLLM** hosted on GPU node pools managed by **KServe**:
 
 ### A. Accelerated Model Loading with GCS FUSE CSI Driver
-Traditional Kubernetes deployments suffer from 15–20 minute pod cold starts as 70B parameter models (140 GB) are downloaded from object storage. 
 On GKE, the native **Cloud Storage FUSE CSI Driver** streams model weights directly into GPU memory with local NVMe caching, reducing pod startup to under **45 seconds**:
 
 ```yaml
@@ -192,67 +207,102 @@ spec:
 
 ---
 
-## 4. 3-Tier Agent Memory Subsystem on Google Cloud
+## 4. 3-Tier Agent Memory Subsystem & Real-Time Synchronization
+
+The agent memory architecture synchronizes real-time streaming state with historical analytical knowledge:
 
 ```mermaid
 flowchart LR
     Agent["AI Agent Worker"]:::purple
 
-    subgraph L1["L1: Working Memory"]
-        Redis["Google Cloud Memorystore / Redis on GKE\n- Sub-millisecond latency\n- Active session buffer & scratchpad\n- TTL: 24 Hours"]:::warning
+    subgraph L1["L1: Real-Time Working & Feature Memory"]
+        Redis["Redis Cluster on GKE (Hyperdisk)\n- Sub-millisecond latency (<2ms)\n- Live sliding-window counters\n- User session buffer & scratchpad"]:::warning
     end
 
-    subgraph L2["L2: Semantic Memory"]
-        Postgres["PostgreSQL + pgvector (CloudNativePG on Hyperdisk)\n- Sub-40ms vector similarity (HNSW)\n- User persona embeddings & long-term knowledge\n- Permanent persistence"]:::warning
+    subgraph L2["L2: Semantic Long-Term Memory"]
+        Postgres["PostgreSQL + pgvector (CloudNativePG)\n- Sub-40ms vector similarity (HNSW)\n- Sub-second streaming vector sync\n- Permanent persona embeddings"]:::warning
     end
 
     subgraph L3["L3: Episodic / Audit Memory"]
-        Iceberg["Apache Iceberg on GCS (gs://lakehouse-data/)\n- Full agent reasoning trajectories & tool logs\n- Audit compliance under Decree 13 PDPD\n- Fine-tuning & offline RLHF/DPO datasets"]:::success
+        Iceberg["Apache Iceberg on GCS (gs://lakehouse-data/)\n- Full agent reasoning trajectories\n- Audit compliance under Decree 13 PDPD\n- Offline RLHF/DPO fine-tuning datasets"]:::success
     end
 
-    Agent <-->|"Active Turn (<2ms)"| L1
-    Agent <-->|"Semantic Search (<40ms)"| L2
-    Agent -->|"Async Event Telemetry"| L3
+    subgraph StreamingEngine["Streaming Feed (Speed Layer)"]
+        FlinkFeed["Apache Flink Streaming Engine\n- Sliding Window Aggregates\n- Real-time Document Vectorizer"]:::primary
+    end
+
+    FlinkFeed -->|"Stream Counters (<5ms)"| L1
+    FlinkFeed -->|"Stream Vectors (<1s)"| L2
+    Agent <-->|"Active Features & Context"| L1
+    Agent <-->|"Semantic Search"| L2
+    Agent -->|"Async Telemetry Logs"| L3
 
     %% Subgraph Styling (Transparent & Dual-Mode Friendly)
     style L1 fill:none,stroke:#f59e0b,stroke-width:1.5px,stroke-dasharray: 4 4,color:#fcd34d
     style L2 fill:none,stroke:#f59e0b,stroke-width:1.5px,stroke-dasharray: 4 4,color:#fcd34d
     style L3 fill:none,stroke:#10b981,stroke-width:1.5px,stroke-dasharray: 4 4,color:#6ee7b7
+    style StreamingEngine fill:none,stroke:#3b82f6,stroke-width:1.5px,stroke-dasharray: 4 4,color:#93c5fd
 
     %% Link Styling
     linkStyle default stroke:#64748b,stroke-width:2px;
 
     %% Universal Dual-Mode High-Contrast Palette
+    classDef primary fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#ffffff;
     classDef success fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ffffff;
     classDef warning fill:#451a03,stroke:#f59e0b,stroke-width:2px,color:#ffffff;
     classDef purple  fill:#2e1065,stroke:#a855f7,stroke-width:2px,color:#ffffff;
 ```
 
-### PostgreSQL + `pgvector` Deployment on GKE
-Managed via the **CloudNativePG Operator** using Google Cloud **Hyperdisk Balanced**:
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: agent-vector-store
-  namespace: ai-platform
-spec:
-  instances: 3
-  storage:
-    storageClass: hyperdisk-balanced
-    size: 250Gi
-  postgresql:
-    parameters:
-      shared_buffers: "16GB"
-      work_mem: "64MB"
-      maintenance_work_mem: "2GB"
-    shared_preload_libraries:
-      - "vector"
-```
+### A. Real-Time Feature Store (Redis L1):
+* Flink streaming jobs calculate real-time behavioral features (e.g., `tx_count_last_10m`, `login_ip_distinct_count_1h`) and flush them directly to Redis via high-throughput pipelining.
+* When an AI agent reasons about a customer request or fraud signal, it fetches pre-computed features in **$< 2\text{ms}$** without querying the analytical Lakehouse.
+
+### B. Near-Real-Time Streaming Vector Ingestion (`pgvector` L2):
+* Traditional platforms vectorize documents in batch mode, leaving vector databases 15–60 minutes behind operational reality.
+* On this platform, a dedicated Flink pipeline extracts incoming text chunks, invokes lightweight embeddings via Triton/FastEmbed, and executes streaming upserts into `pgvector` with HNSW indices in **$< 1\text{ second}$**.
+* HNSW tuning parameters on Hyperdisk: `m = 16`, `ef_construction = 128` to maintain low write latency without sacrificing search recall.
 
 ---
 
-## 5. Model Context Protocol (MCP) Gateway on GKE
+## 5. Event-Driven Reactive AI Agents on GKE
+
+In addition to user-prompted agents, the platform natively supports **Event-Driven Autonomous Agents** reacting to real-time stream anomalies:
+
+1. **Anomaly Detection & Signal Emission:**
+   * Apache Flink evaluates complex event patterns (CEP) over transaction streams.
+   * Upon detecting anomalous thresholds (e.g., account takeover velocity or operational failure), Flink writes a standardized **CloudEvent** to Kafka topic `ai.agent.triggers.priority`.
+2. **KEDA Event-Driven Worker Scaling:**
+   * A **KEDA `ScaledJob`** monitors Kafka topic consumer lag. When messages arrive, KEDA immediately spins up ephemeral Agent Worker pods:
+   ```yaml
+   apiVersion: keda.sh/v1alpha1
+   kind: ScaledJob
+   metadata:
+     name: reactive-fraud-agent-job
+     namespace: ai-agents
+   spec:
+     jobTargetRef:
+       template:
+         spec:
+           containers:
+           - name: agent-worker
+             image: internal-registry.corp/agents/fraud-mitigation-agent:1.2.0
+             env:
+             - name: KAFKA_TOPIC
+               value: "ai.agent.triggers.priority"
+     triggers:
+     - type: kafka
+       metadata:
+         bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc:9092"
+         consumerGroup: "reactive-fraud-agents"
+         topic: "ai.agent.triggers.priority"
+         lagThreshold: "1"
+   ```
+3. **Autonomous Remediation Loop:**
+   * The ephemeral agent worker pulls the alert, loads real-time feature context from Redis L1, executes isolated diagnostic queries via the MCP Gateway, queries vLLM for root-cause analysis, and dispatches mitigation webhooks.
+
+---
+
+## 6. Model Context Protocol (MCP) Gateway on GKE
 
 The **Model Context Protocol (MCP)** standardizes tool integration between AI agents and the data platform:
 * **Exposed Data Platform Tools:**

@@ -1,7 +1,13 @@
 # Enterprise Kubernetes AI & Data Platform on Google Cloud (GCP)
 ## Architecture Blueprint Suite
 
-This repository contains the complete architectural specification for the **Unified Kubernetes AI & Data Platform running on Google Cloud Platform (GCP)**. The platform is designed on **Google Kubernetes Engine (GKE)** to support both **traditional Lakehouse workloads** (Batch, Streaming, Interactive SQL, BI) and **first-class AI Agent workloads** (LLM serving, sandboxed tool execution, agent memory hierarchy, Model Context Protocol, and real-time semantic retrieval).
+This repository contains the complete architectural specification for the **Unified Kubernetes AI & Data Platform running on Google Cloud Platform (GCP)**. 
+
+The platform is engineered on **Google Kubernetes Engine (GKE)** as a single, cohesive fabric supporting:
+1. **Real-Time & Near-Real-Time Stream Processing:** Sub-second transactional CDC (Debezium, Strimzi Kafka, Karapace) and stateful stream processing (Apache Flink) with dual-speed routing.
+2. **Open Modern Lakehouse:** Decoupled columnar storage on Google Cloud Storage (GCS), Apache Iceberg v2 tables with Lakekeeper Rust-native REST Catalog, Trino interactive SQL with NVMe caching, and Spark-on-K8s batch ETL on Spot VMs.
+3. **Autonomous AI Agents & LLM Serving:** High-throughput vLLM model serving with GCS FUSE direct streaming, native GKE Sandbox (managed gVisor) for untrusted tool execution, 3-tier memory (Redis L1, `pgvector` L2, GCS Iceberg L3), and event-driven reactive agent triggers via KEDA.
+4. **Enterprise Governance & FinOps:** Vietnam Decree 13 PDPD inline masking, OpenMetadata end-to-end lineage, VPC Service Controls, Cloud KMS CMEK, Kafka tiered storage, and GKE Spot VM economics.
 
 ---
 
@@ -9,13 +15,13 @@ This repository contains the complete architectural specification for the **Unif
 
 ```mermaid
 flowchart TD
-    Index["docs/architectures/README.md\n(Master Architecture Index)"]:::gray
-    Doc0["00: Overview & Requirements on GCP\n- Business Context & NFRs\n- Lakehouse vs. AI Agent Demands on GKE"]:::primary
-    Doc1["01: Infrastructure & Storage Fabric\n- GKE Regional Cluster (Multi-Zone Node Pools)\n- GCS (GCSFileIO), Hyperdisk, Local SSD, GCS FUSE CSI\n- GKE Dataplane V2 (Cilium) & Workload Identity"]:::cyan
-    Doc2["02: Open Lakehouse & Compute on GKE\n- Apache Iceberg on GCS & Lakekeeper REST Catalog\n- Spark-on-K8s on Spot VMs, Trino NVMe Cache, Flink CDC\n- Strimzi Kafka on Hyperdisk & Airflow Orchestration"]:::success
-    Doc3["03: AI Agent & LLM Runtime on GKE\n- vLLM & KServe on NVIDIA L4 / A100 GPU Pools\n- Native GKE Sandbox (gVisor) for Dynamic Tool Sandboxing\n- 3-Tier Memory Hierarchy (Redis, pgvector, GCS Iceberg)\n- Model Context Protocol (MCP) Gateway"]:::purple
-    Doc4["04: Governance, Security & Observability on GCP\n- Vietnam PDPD Decree 13 Compliance & VPC Service Controls\n- OpenMetadata End-to-End Lineage\n- Google Cloud Managed Prometheus (GMP) & Agent Tracing"]:::danger
-    Doc5["05: HA, Disaster Recovery & FinOps on GCP\n- GKE Regional Multi-Zone HA & GCS Dual-Region Buckets\n- Backup for GKE & CloudNativePG WAL Archival\n- GKE Spot VMs, NVIDIA L4 Sizing, GCS Lifecycle Tiering"]:::warning
+    Index["docs/architectures/README.md\n(Master Architecture Blueprint Index)"]:::gray
+    Doc0["00: Architecture Overview & Workload Requirements\n- Real-Time, Lakehouse & AI Agent Cohesion\n- 4-Tier Latency Taxonomy & SLA Targets\n- Workload Comparison & Core GCP Tenets"]:::primary
+    Doc1["01: Infrastructure, GKE & Cloud Storage Fabric\n- GKE Regional Cluster (Multi-Zone Node Pools)\n- 3-Tier Storage Continuum (Kafka, pgvector/Redis, GCS Iceberg)\n- GKE Dataplane V2 (Cilium) & Workload Identity"]:::cyan
+    Doc2["02: Open Lakehouse, Distributed Compute & Pipelines\n- Debezium CDC, Karapace Schema Registry, Strimzi Kafka\n- Stateful Flink Operator & RocksDB NVMe State\n- Streaming-to-Iceberg Protocol (60s Commits & Compactor)\n- Spark-on-K8s on Spot VMs & Trino NVMe Cache"]:::success
+    Doc3["03: AI Agent Runtimes, LLM Serving & Memory\n- vLLM & KServe on NVIDIA L4 / A100 GPU Pools\n- GKE Sandbox (gVisor) for Dynamic Python Tools\n- 3-Tier Memory: Live Redis L1, Streaming pgvector L2, GCS L3\n- Event-Driven Reactive Agents (Kafka + KEDA)"]:::purple
+    Doc4["04: Governance, Security, Privacy & Observability\n- Vietnam PDPD Decree 13 Compliance & Inline Stream Masking\n- OpenMetadata Dual-Speed Lineage (Speed vs Lakehouse)\n- Google Cloud Managed Prometheus & Streaming SLIs"]:::danger
+    Doc5["05: HA, Disaster Recovery & FinOps on GCP\n- Multi-Zone Regional HA (Kafka, Flink, Trino, Lakekeeper)\n- GCS Dual-Region Replication & Backup for GKE\n- Kafka Tiered Storage to GCS & Spark Spot VM Savings"]:::warning
 
     Index --> Doc0
     Doc0 --> Doc1
@@ -41,15 +47,15 @@ flowchart TD
 
 ## Document Index
 
-1. **[Document 00: Architecture Overview & Workload Requirements on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform/docs/architectures/00_overview_and_requirements.md)**
-   * Executive summary, architectural principles, comparative analysis of Lakehouse vs. AI Agent workloads on GKE, and GCP-specific SLIs/SLOs.
-2. **[Document 01: Infrastructure, GKE & Cloud Storage Fabric](file:///c:/Users/ToanBX/dev/personal/data_platform/docs/architectures/01_infrastructure_and_storage.md)**
-   * GKE Regional Cluster node pool topology (Lakehouse, Stateful, GPU, and Sandbox Pools), storage primitives (GCS, Hyperdisk Balanced, GCS FUSE CSI, Local NVMe SSDs), GKE Dataplane V2 (Cilium eBPF), and GKE Workload Identity Federation.
-3. **[Document 02: Open Lakehouse, Distributed Compute & Pipeline Engineering on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform/docs/architectures/02_lakehouse_and_compute.md)**
-   * Decoupled Lakehouse on Google Cloud Storage (`GCSFileIO`), Lakekeeper Rust-native REST Catalog dispensing downscoped GCP OAuth2 tokens, Spark-on-K8s on GKE Spot VMs, Trino with Local NVMe SSD caching, Flink CDC, Strimzi Kafka, Airflow, and automated LakeOps maintenance routines.
-4. **[Document 03: AI Agent Runtimes, LLM Serving & Memory Architecture on GKE](file:///c:/Users/ToanBX/dev/personal/data_platform/docs/architectures/03_ai_agent_and_llm_runtime.md)**
-   * vLLM with GCS FUSE direct model streaming on NVIDIA L4/A100 GPUs, KServe autoscaling, native **GKE Sandbox (managed gVisor)** for untrusted Python tool execution, the Model Context Protocol (MCP) Gateway, and the 3-Tier Memory Hierarchy (Redis L1, PostgreSQL `pgvector` L2, GCS Iceberg L3).
-5. **[Document 04: Governance, Security, Privacy & Full-Stack Observability on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform/docs/architectures/04_governance_security_and_observability.md)**
-   * Vietnam Personal Data Protection Decree 13 (Decree 13/2023/ND-CP) compliance via inline PII masking proxy, Cloud KMS CMEK, VPC Service Controls, OpenMetadata automated lineage, and Google Cloud Managed Service for Prometheus (GMP) with OpenTelemetry agent tracing.
-6. **[Document 05: High Availability, Disaster Recovery & FinOps on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform/docs/architectures/05_ha_dr_and_finops.md)**
-   * Multi-zone GKE topology, GCS Dual-Region geo-replication, Backup for GKE, GKE Spot VM economics (80% batch savings), NVIDIA L4 right-sizing, and GCS Object Lifecycle Management.
+1. **[Document 00: Architecture Overview & Workload Requirements on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/00_overview_and_requirements.md)**
+   * Executive summary, unified dual-speed architecture, 3-way workload comparison (Lakehouse vs. Streaming vs. AI Agents), and the 4-Tier Latency Taxonomy & SLA benchmarks.
+2. **[Document 01: Infrastructure, GKE & Cloud Storage Fabric](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/01_infrastructure_and_storage.md)**
+   * GKE Regional Cluster node pool topology (Compute, Stateful, GPU, and Sandbox Pools), the 3-Tier Storage Continuum (Kafka as Tier 0 Streaming Log Storage, pgvector/Redis as Tier 1, Iceberg on GCS as Tier 2), GKE Dataplane V2 (Cilium eBPF), and GKE Workload Identity Federation.
+3. **[Document 02: Open Lakehouse, Distributed Compute & Pipeline Engineering on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/02_lakehouse_and_compute.md)**
+   * Transactional CDC (Debezium + Outbox Pattern + Karapace Schema Registry), Strimzi Kafka on Hyperdisk, Flink Kubernetes Operator in Application Mode, solving the "Streaming to Iceberg" small files problem ($60\text{s}$ commit boundary, append-only bronze vs MOR with position deletes, streaming compaction daemon), Lakekeeper REST Catalog, Trino NVMe caching, and Spark on Spot VMs.
+4. **[Document 03: AI Agent Runtimes, LLM Serving & Memory Architecture on GKE](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/03_ai_agent_and_llm_runtime.md)**
+   * vLLM with GCS FUSE direct model streaming on NVIDIA L4/A100 GPUs, KServe autoscaling, native **GKE Sandbox (managed gVisor)** for untrusted Python tool execution, 3-Tier Memory Synchronization (sub-5ms feature streaming to Redis L1, sub-second vector streaming to `pgvector` L2, and L3 episodic Iceberg audit log), and event-driven reactive AI agents triggered via Kafka and KEDA.
+5. **[Document 04: Governance, Security, Privacy & Full-Stack Observability on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/04_governance_security_and_observability.md)**
+   * Vietnam Personal Data Protection Decree 13 (Decree 13/2023/ND-CP) compliance with inline stream PII masking, OpenMetadata Dual-Speed Lineage tracking, VPC Service Controls, Cloud KMS CMEK, and Google Cloud Managed Service for Prometheus (GMP) with streaming SLI alerts.
+6. **[Document 05: High Availability, Disaster Recovery & FinOps on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/05_ha_dr_and_finops.md)**
+   * Regional multi-zone HA topology (Kafka, Flink, Trino, Lakekeeper), streaming DR with Kafka MirrorMaker 2 and Flink checkpoint restoration from GCS Dual-Region buckets, and streaming FinOps (Kafka Tiered Storage saving 70% disk cost, Spark Spot VMs saving 80%, NVIDIA L4 GPU right-sizing).

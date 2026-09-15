@@ -15,28 +15,28 @@ flowchart TB
         end
 
         subgraph GKENodePools["GKE Node Pools (Multi-Zone Autoscaling)"]
-            subgraph PoolLakehouse["Lakehouse Compute Pool (Spot & On-Demand)"]
-                LP1["c3-standard-44 + Local NVMe SSD\n(Spark Executors / Trino Workers)"]:::primary
+            subgraph PoolLakehouse["Lakehouse & Stream Compute Pool (Spot & On-Demand)"]
+                LP1["c3-standard-44 + Local NVMe SSD\n(Spark Executors / Trino Workers / Flink TaskManagers)"]:::primary
             end
 
-            subgraph PoolStateful["Stateful & Database Pool"]
-                SP1["n2-standard-16 + Hyperdisk Balanced\n(Kafka Brokers / PostgreSQL pgvector / Cassandra)"]:::warning
+            subgraph PoolStateful["Stateful, Event Log & Streaming Pool"]
+                SP1["n2-standard-16 + Hyperdisk Balanced\n(Kafka Brokers / Debezium Connect / Karapace / pgvector)"]:::warning
             end
 
             subgraph PoolGPU["AI Serving GPU Pool"]
-                GP1["g2-standard-32 (NVIDIA L4) / a2-highgpu-4g (A100)\n(vLLM / KServe Model Serving)"]:::purple
+                GP1["g2-standard-32 (NVIDIA L4) / a2-highgpu-4g (A100)\n(vLLM / KServe Model Predictors & Embeddings)"]:::purple
             end
 
             subgraph PoolSandbox["Agent Tool Sandbox Pool (GKE Sandbox)"]
-                SBP1["c2-standard-8 with GKE Sandbox (gVisor)\n(Untrusted Dynamic Code Execution)"]:::danger
+                SBP1["c2-standard-8 with GKE Sandbox (gVisor)\n(Untrusted Dynamic Python / SQL Tool Execution)"]:::danger
             end
         end
 
-        subgraph GCPStorageFabric["Google Cloud Storage Fabric"]
-            GCSLakehouse["Google Cloud Storage (GCS)\n- gs://lakehouse-data/ (Iceberg Parquet)\n- Standard -> Nearline Lifecycle"]:::success
+        subgraph GCPStorageFabric["Google Cloud Storage Fabric & Storage Continuum"]
+            GCSLakehouse["Google Cloud Storage (GCS)\n- gs://lakehouse-data/ (Iceberg Bronze/Silver/Gold)\n- gs://lakehouse-flink-checkpoints/ (RocksDB Checkpoints)\n- gs://kafka-tiered-storage/ (Historical Topic Segments)"]:::success
             GCSModels["GCS Model Weights Bucket\n- gs://ai-model-registry/ (vLLM Models)\n- Accessed via GCS FUSE CSI Driver"]:::purple
-            Hyperdisk["Google Cloud Hyperdisk Balanced / Extreme\n(Sub-millisecond Block Storage CSI)"]:::warning
-            LocalSSD["GKE Local NVMe SSDs\n(Ephemeral Scratch & Cache)"]:::cyan
+            Hyperdisk["Google Cloud Hyperdisk Balanced\n(Sub-5ms Log & DB Block Storage CSI)"]:::warning
+            LocalSSD["GKE Local NVMe SSDs (RAID0)\n(Flink RocksDB State / Trino Cache / Spark Shuffle)"]:::cyan
         end
     end
 
@@ -44,6 +44,7 @@ flowchart TB
     PoolLakehouse <--> GCSLakehouse
     PoolLakehouse <--> LocalSSD
     PoolStateful <--> Hyperdisk
+    PoolStateful <--> GCSLakehouse
     PoolGPU <--> GCSModels
     PoolSandbox <--> GKENodePools
 
@@ -78,8 +79,8 @@ Workloads are strictly isolated across dedicated GKE Node Pools using Kubernetes
 
 | Node Pool Name | Target Workloads | Machine Type | Taints / Flags | Storage Attached |
 | :--- | :--- | :--- | :--- | :--- |
-| **`pool-lakehouse-compute`** | Spark Executors, Trino Workers, Flink TaskManagers | `c3-standard-44` (44 vCPU, 176 GB RAM) | `workload=lakehouse:NoSchedule`<br>*(Mixed On-Demand & Spot)* | 2x 375GB Local NVMe SSDs (RAID0 for Spark shuffle & Trino cache) |
-| **`pool-stateful-storage`** | Kafka Brokers, CloudNativePG, Cassandra, Lakekeeper DB | `n2-standard-16` (16 vCPU, 64 GB RAM) | `workload=stateful:NoSchedule` | Google Cloud Hyperdisk Balanced (up to 20,000 IOPS, 500 MB/s) |
+| **`pool-lakehouse-compute`** | Spark Executors, Trino Workers, Flink TaskManagers | `c3-standard-44` (44 vCPU, 176 GB RAM) | `workload=lakehouse:NoSchedule`<br>*(Mixed On-Demand & Spot)* | 2x 375GB Local NVMe SSDs (RAID0 for Spark shuffle, Trino cache, & Flink RocksDB state) |
+| **`pool-stateful-storage`** | Kafka Brokers, Debezium Connect, Karapace, CloudNativePG, Lakekeeper DB | `n2-standard-16` (16 vCPU, 64 GB RAM) | `workload=stateful:NoSchedule` | Google Cloud Hyperdisk Balanced (up to 20,000 IOPS, 500 MB/s per broker) |
 | **`pool-ai-gpu`** | vLLM Engine, KServe Model Predictors, Embeddings | `g2-standard-32` (1x L4 24GB) or `a2-highgpu-4g` (4x A100 80GB) | `nvidia.com/gpu=present:NoSchedule`<br>`--enable-gcsfuse-csi-driver` | GCS FUSE CSI Driver (read-only model weights cache) + Boot Disk |
 | **`pool-agent-sandbox`** | Ephemeral Python/SQL tool execution spawned by agents | `e2-standard-8` (8 vCPU, 32 GB RAM) | `workload=sandbox:NoSchedule`<br>`--sandbox type=gvisor` | Ephemeral `emptyDir` (RAM backed) |
 
@@ -128,34 +129,38 @@ resource "google_container_node_pool" "gpu_ai_serving" {
 
 ---
 
-## 3. Storage Fabric on Google Cloud
+## 3. Storage Fabric & The Enterprise Storage Continuum
 
-The storage architecture leverages four distinct GCP storage primitives to maximize performance and minimize cost:
+Data storage is architected as a **tiered continuum** ranging from sub-millisecond append-only event logs to petabyte-scale analytical tables:
 
 ```mermaid
 flowchart LR
-    subgraph WorkloadAccess["Workload Access Pattern"]
-        Analytics["Analytical Lakehouse\n(Iceberg)"]:::primary
-        StatefulDBs["Kafka / PostgreSQL\n(pgvector) / Cassandra"]:::warning
+    subgraph WorkloadAccess["Workload Access Patterns"]
+        StreamLogs["Streaming Events & CDC\n(Sub-second Producers)"]:::warning
+        OperationalDBs["Operational Lookups &\nVector Search (pgvector)"]:::warning
+        Analytics["Analytical Lakehouse\n(Iceberg Readers)"]:::primary
         ModelServing["vLLM Model Serving Pods"]:::purple
-        ShuffleCache["Spark Shuffle &\nTrino Cache"]:::cyan
+        Scratch["Flink RocksDB State &\nTrino NVMe Cache"]:::cyan
     end
 
-    subgraph GCPStoragePrimitives["GCP Storage Primitives"]
-        GCS["Google Cloud Storage (GCS)\n- Standard / Nearline Buckets\n- GCSFileIO API (Multi-Region)"]:::success
-        Hyperdisk["Google Cloud Hyperdisk Balanced\n- Sub-ms IOPS via GKE CSI\n- Dynamic Volume Provisioning"]:::warning
-        GCSFuse["Cloud Storage FUSE CSI Driver\n- Mounts GCS bucket as POSIX\n- In-memory & local cache"]:::purple
-        LocalNVMe["GKE Local SSD (NVMe)\n- Raw scratch throughput (GB/s)\n- Direct host-path mount"]:::cyan
+    subgraph StorageHierarchy["GCP Storage Continuum"]
+        Tier0["Tier 0: Streaming Log Storage\n- Strimzi Kafka on Hyperdisk\n- Tiered Storage to GCS\n- Replayable, Immutable Commit Log"]:::warning
+        Tier1["Tier 1: Operational / Vector Store\n- PostgreSQL pgvector on Hyperdisk\n- Redis L1 Real-Time Cache\n- Sub-ms Point Reads & HNSW"]:::warning
+        Tier2["Tier 2: Analytical Lakehouse\n- GCS Multi-Region Buckets\n- Apache Iceberg Parquet Tables\n- GCSFileIO API & Lifecycle Tiering"]:::success
+        TierWeights["Model Weights Storage\n- GCS FUSE CSI Driver\n- Streamed to GPU VRAM"]:::purple
+        TierLocal["Ephemeral NVMe Scratch Tier\n- GKE Local SSD (RAID0 NVMe)\n- Flink RocksDB Checkpoints (Local)"]:::cyan
     end
 
-    Analytics --> GCS
-    StatefulDBs --> Hyperdisk
-    ModelServing --> GCSFuse
-    ShuffleCache --> LocalNVMe
+    StreamLogs --> Tier0
+    OperationalDBs --> Tier1
+    Analytics --> Tier2
+    ModelServing --> TierWeights
+    Scratch --> TierLocal
+    Tier0 -.->|"Tiered Segment Offloading"| Tier2
 
     %% Subgraph Styling (Transparent & Dual-Mode Friendly)
     style WorkloadAccess fill:none,stroke:#475569,stroke-width:1.5px,stroke-dasharray: 5 5,color:#94a3b8
-    style GCPStoragePrimitives fill:none,stroke:#10b981,stroke-width:1.5px,stroke-dasharray: 5 5,color:#6ee7b7
+    style StorageHierarchy fill:none,stroke:#10b981,stroke-width:1.5px,stroke-dasharray: 5 5,color:#6ee7b7
 
     %% Link Styling
     linkStyle default stroke:#64748b,stroke-width:2px;
@@ -170,52 +175,31 @@ flowchart LR
     classDef gray    fill:#0f172a,stroke:#475569,stroke-width:1.5px,color:#e2e8f0;
 ```
 
-### 1. Google Cloud Storage (GCS) for Apache Iceberg
+### 1. Tier 0: Streaming Log Storage (Strimzi Kafka on Hyperdisk Balanced + GCS Tiered Storage)
+* **Is a Message Bus Considered Storage?** Yes. Kafka is an immutable, distributed commit-log storage system. Messages are flushed to disk in sequential segments and replicated across availability zones.
+* **Durability & Replication:** Managed by the Strimzi Kafka Operator on GKE. Brokers mount `hyperdisk-balanced` with `min.insync.replicas: 2` and `acks: all`, ensuring zero data loss during zone outages.
+* **Tiered Storage Offloading:** Older topic segments ($> 24\text{ hours}$) are automatically uploaded to `gs://kafka-tiered-storage/`, allowing topics to retain replayable changelogs indefinitely at GCS object-storage prices while keeping local Hyperdisk volumes small and high-performance.
+
+### 2. Tier 1: Low-Latency Operational & Vector Storage (PostgreSQL `pgvector` & Redis)
+* **Storage Primitives:** Backed by Hyperdisk Balanced with dynamically configured IOPS (up to 20,000 IOPS) and Throughput (500 MB/s).
+* **Redis Cluster:** In-memory key-value state for Tier 0 hard real-time feature retrieval ($< 5\text{ms}$) and working agent memory.
+
+### 3. Tier 2: Analytical Lakehouse Storage (Google Cloud Storage for Apache Iceberg)
 * **Bucket Layout:** `gs://data-platform-lakehouse-prod/`
 * **File Format:** Columnar Apache Parquet with Zstandard (ZSTD) compression.
-* **Storage Class Management:** GCS Object Lifecycle Management rules automatically transition snapshots and cold partitions older than 90 days from `STANDARD` to `NEARLINE` storage, cutting storage costs by 50%.
+* **Lifecycle Policies:** GCS Object Lifecycle Management rules automatically transition cold snapshots and uncompacted bronze files older than 90 days from `STANDARD` to `NEARLINE` storage, cutting analytical storage costs by 50%.
 
-### 2. Cloud Storage FUSE CSI Driver for vLLM Model Serving
-Rather than bundling 140 GB of model weights into container images or duplicating downloads across pods, GKE's native **Cloud Storage FUSE CSI driver** streams weights directly from GCS:
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: vllm-worker
-  namespace: ai-serving
-  annotations:
-    gke-gcsfuse/volumes: "true"
-    gke-gcsfuse/cpu-limit: "2"
-    gke-gcsfuse/memory-limit: "4Gi"
-spec:
-  containers:
-  - name: vllm-container
-    image: vllm/vllm-openai:latest
-    volumeMounts:
-    - name: gcs-model-weights
-      mountPath: /models
-      readOnly: true
-  volumes:
-  - name: gcs-model-weights
-    csi:
-      driver: gcsfuse.csi.storage.gke.io
-      readOnly: true
-      volumeAttributes:
-        bucketName: data-platform-models-prod
-        mountOptions: "implicit-dirs,file-cache:max-size-mb:200000"
-```
-
-### 3. Hyperdisk Balanced for Low-Latency Databases
-Stateful pods (PostgreSQL `pgvector`, Kafka brokers) mount Kubernetes `PersistentVolumeClaims` backed by `hyperdisk-balanced`:
-* Dynamically tuneable IOPS (up to 20,000 IOPS) and Throughput (up to 500 MB/s) without recreating disks.
+### 4. Ephemeral Acceleration: GKE Local NVMe SSDs
+* **Flink Stateful Streaming:** Flink TaskManagers mount local NVMe SSDs (`/mnt/disks/local-nvme/rocksdb`) to host active RocksDB state. This delivers sub-millisecond state read/writes while state checkpoints are saved asynchronously to `gs://lakehouse-flink-checkpoints/`.
+* **Trino SSD Caching & Spark Shuffle:** Mounts local NVMe in RAID0 for intermediate data processing.
 
 ---
 
 ## 4. Networking: GKE Dataplane V2 (Cilium eBPF) & VPC Architecture
 
 * **GKE Dataplane V2:** Fully leverages Cilium eBPF natively integrated and managed by Google Cloud:
-  * Replaces `kube-proxy` for line-rate packet processing.
-  * Native Kubernetes NetworkPolicy enforcement for agent sandbox isolation.
+  * Replaces `kube-proxy` for line-rate packet processing with sub-millisecond latency for Kafka producers and Flink stream pipelines.
+  * Native Kubernetes NetworkPolicy enforcement for agent sandbox isolation and cross-pool firewalls.
 * **Private Google Access & Private Service Connect (PSC):** Ensures traffic from GKE pods to GCS, Cloud KMS, and Cloud Logging never traverses the public internet.
 * **VPC Native IP Allocation:** Pod IPs are natively routable within the Google Cloud Virtual Private Cloud (VPC), avoiding double-NAT overhead.
 

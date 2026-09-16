@@ -1,5 +1,5 @@
 # Solution Architecture: Unified Kubernetes AI & Data Platform on Google Cloud (GCP)
-## Document 04: Governance, Security, Privacy & Full-Stack Observability on GCP
+## Document 05: Governance, Security, Privacy & Full-Stack Observability on GCP
 
 ---
 

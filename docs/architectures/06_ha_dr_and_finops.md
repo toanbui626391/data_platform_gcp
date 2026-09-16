@@ -1,5 +1,5 @@
 # Solution Architecture: Unified Kubernetes AI & Data Platform on Google Cloud (GCP)
-## Document 05: High Availability, Disaster Recovery & FinOps on GCP
+## Document 06: High Availability, Disaster Recovery & FinOps on GCP
 
 ---
 

@@ -1,5 +1,5 @@
 # Solution Architecture: Unified Kubernetes AI & Data Platform on Google Cloud (GCP)
-## Document 03: AI Agent Runtimes, LLM Serving & Memory Architecture on GKE
+## Document 04: AI Agent Runtimes, LLM Serving & Memory Architecture on GKE
 
 ---
 
@@ -310,4 +310,4 @@ The **Model Context Protocol (MCP)** standardizes tool integration between AI ag
   2. `search_vector_knowledge`: Performs cosine similarity queries on PostgreSQL `pgvector`.
   3. `inspect_catalog_metadata`: Reads table documentation and schema definitions from Lakekeeper.
 * **Security & Rate Limiting:** Enforces token-bucket rate limiting, checks GKE Workload Identity credentials, and logs all tool executions to the L3 Iceberg audit log.
-* **Deep Architectural Integration:** For complete architectural details on Hybrid RAG retrieval, two-stage BGE cross-encoder reranking, and semantic chunking pipelines, see **[Document 04: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/04_rag_system_architecture.md)**.
+* **Deep Architectural Integration:** For complete architectural details on Hybrid RAG retrieval, two-stage BGE cross-encoder reranking, and semantic chunking pipelines, see **[Document 03: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/03_rag_system_architecture.md)**.

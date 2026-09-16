@@ -1,5 +1,5 @@
 # Solution Architecture: Unified Kubernetes AI & Data Platform on Google Cloud (GCP)
-## Document 04: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP
+## Document 03: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP
 
 ---
 
@@ -10,7 +10,7 @@ Retrieval-Augmented Generation (RAG) within modern enterprises must bridge the d
 Rather than treating RAG as an isolated, off-cluster vector database wrapper, this architecture embeds RAG as an integral, native subsystem of the **Unified Kubernetes AI & Data Platform on Google Cloud (GCP)**. It integrates directly with:
 * The **3-Tier Storage Continuum** defined in [Document 01](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/01_infrastructure_and_storage.md) (Tier 0 Kafka event logs, Tier 1 `pgvector`/Redis operational state, Tier 2 GCS Iceberg tables, and GCS FUSE model weights).
 * The **Dual-Speed Compute Fabric** defined in [Document 02](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/02_lakehouse_and_compute.md) (sub-second streaming chunking/vectorization via Apache Flink and petabyte-scale batch document backfilling via Spark-on-K8s on Spot VMs).
-* The **Autonomous AI Agent & LLM Serving Runtimes** defined in [Document 03](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/03_ai_agent_and_llm_runtime.md) (vLLM on NVIDIA L4/A100 GPUs, GKE Sandbox gVisor execution, and the Model Context Protocol Gateway).
+* The **Autonomous AI Agent & LLM Serving Runtimes** defined in [Document 04](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/04_ai_agent_and_llm_runtime.md) (vLLM on NVIDIA L4/A100 GPUs, GKE Sandbox gVisor execution, and the Model Context Protocol Gateway).
 * **Enterprise Governance & Privacy** defined in [Document 05](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/05_governance_security_and_observability.md) (Vietnam Personal Data Protection Decree 13 inline masking, Right-to-be-Forgotten cascading purges, and OpenMetadata dual-speed citation lineage).
 
 ```mermaid
@@ -359,7 +359,7 @@ Before injecting retrieved passages into vLLM:
 
 ## 5. Agentic RAG & Model Context Protocol (MCP) Integration
 
-RAG on this platform is not static semantic lookup; it is **Agentic RAG**, orchestrated through the **Model Context Protocol (MCP) Gateway** defined in [Document 03](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/03_ai_agent_and_llm_runtime.md).
+RAG on this platform is not static semantic lookup; it is **Agentic RAG**, orchestrated through the **Model Context Protocol (MCP) Gateway** defined in [Document 04](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/04_ai_agent_and_llm_runtime.md).
 
 ```mermaid
 flowchart TD
@@ -478,8 +478,8 @@ The platform continuously evaluates RAG quality in staging and production using 
 * [Document 00: Architecture Overview & Workload Requirements on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/00_overview_and_requirements.md)
 * [Document 01: Infrastructure, GKE & Cloud Storage Fabric](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/01_infrastructure_and_storage.md)
 * [Document 02: Open Lakehouse, Distributed Compute & Pipeline Engineering on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/02_lakehouse_and_compute.md)
-* [Document 03: AI Agent Runtimes, LLM Serving & Memory Architecture on GKE](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/03_ai_agent_and_llm_runtime.md)
-* [Document 04: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/04_rag_system_architecture.md)
+* [Document 03: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/03_rag_system_architecture.md)
+* [Document 04: AI Agent Runtimes, LLM Serving & Memory Architecture on GKE](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/04_ai_agent_and_llm_runtime.md)
 * [Document 05: Governance, Security, Privacy & Full-Stack Observability on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/05_governance_security_and_observability.md)
 * [Document 06: High Availability, Disaster Recovery & FinOps on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/06_ha_dr_and_finops.md)
 * [Master Architecture Blueprint & Index](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/README.md)

@@ -22,6 +22,7 @@ flowchart TD
     Doc3["03: AI Agent Runtimes, LLM Serving & Memory\n- vLLM & KServe on NVIDIA L4 / A100 GPU Pools\n- GKE Sandbox (gVisor) for Dynamic Python Tools\n- 3-Tier Memory: Live Redis L1, Streaming pgvector L2, GCS L3\n- Event-Driven Reactive Agents (Kafka + KEDA)"]:::purple
     Doc4["04: Governance, Security, Privacy & Observability\n- Vietnam PDPD Decree 13 Compliance & Inline Stream Masking\n- OpenMetadata Dual-Speed Lineage (Speed vs Lakehouse)\n- Google Cloud Managed Prometheus & Streaming SLIs"]:::danger
     Doc5["05: HA, Disaster Recovery & FinOps on GCP\n- Multi-Zone Regional HA (Kafka, Flink, Trino, Lakekeeper)\n- GCS Dual-Region Replication & Backup for GKE\n- Kafka Tiered Storage to GCS & Spark Spot VM Savings"]:::warning
+    Doc6["06: Enterprise Hybrid RAG, Pipelines & Retrieval\n- Dual-Speed Ingestion: Flink Streaming & Spark-on-K8s Batch\n- Hybrid Search (pgvector HNSW + BM25 tsvector) & RRF\n- Two-Stage BGE Cross-Encoder Reranker on L4 GPUs\n- Agentic RAG with MCP Tools & Decree 13 Citation Lineage"]:::purple
 
     Index --> Doc0
     Doc0 --> Doc1
@@ -29,6 +30,7 @@ flowchart TD
     Doc2 --> Doc3
     Doc3 --> Doc4
     Doc4 --> Doc5
+    Doc5 --> Doc6
 
     %% Link Styling
     linkStyle default stroke:#64748b,stroke-width:2px;
@@ -59,3 +61,5 @@ flowchart TD
    * Vietnam Personal Data Protection Decree 13 (Decree 13/2023/ND-CP) compliance with inline stream PII masking, OpenMetadata Dual-Speed Lineage tracking, VPC Service Controls, Cloud KMS CMEK, and Google Cloud Managed Service for Prometheus (GMP) with streaming SLI alerts.
 6. **[Document 05: High Availability, Disaster Recovery & FinOps on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/05_ha_dr_and_finops.md)**
    * Regional multi-zone HA topology (Kafka, Flink, Trino, Lakekeeper), streaming DR with Kafka MirrorMaker 2 and Flink checkpoint restoration from GCS Dual-Region buckets, and streaming FinOps (Kafka Tiered Storage saving 70% disk cost, Spark Spot VMs saving 80%, NVIDIA L4 GPU right-sizing).
+7. **[Document 06: Enterprise Hybrid RAG, Knowledge Pipelines & Semantic Retrieval on GCP](file:///c:/Users/ToanBX/dev/personal/data_platform_gcp/docs/architectures/06_rag_system_architecture.md)**
+   * Dual-speed knowledge ingestion (sub-second streaming chunking & vectorization via Flink and batch processing via Spark-on-K8s), PostgreSQL `pgvector` HNSW index combined with BM25 full-text search (`tsvector`) via Reciprocal Rank Fusion (RRF), two-stage retrieval with BGE cross-encoder reranking on NVIDIA L4 GPUs, Agentic RAG integration via the Model Context Protocol (MCP) Gateway, Vietnam Decree 13 PDPD PII scrubbing, RTBF cascading purges, and OpenMetadata end-to-end citation lineage.
